@@ -11,6 +11,12 @@ use Illuminate\Support\Facades\Artisan;
 
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
+if (!function_exists('blank')) {
+    function blank($value)
+    {
+        return empty($value) && !is_numeric($value);
+    }
+}
 
 class MakeApiServiceCommand extends Command
 {
@@ -20,39 +26,12 @@ class MakeApiServiceCommand extends Command
 
     public function handle(): int
     {
-        $model = (string) str($this->argument('resource') ?? text(
-            label: 'What is the Resource name?',
-            placeholder: 'Blog',
-            required: true,
-        ))
-            ->studly()
-            ->beforeLast('Resource')
-            ->trim('/')
-            ->trim('\\')
-            ->trim(' ')
-            ->studly()
-            ->replace('/', '\\');
-
-        if (blank($model)) {
-            $model = 'Resource';
-        }
-
-        $modelClass = (string) str($model)->afterLast('\\');
-
-        $modelNamespace = str($model)->contains('\\') ?
-            (string) str($model)->beforeLast('\\') :
-            '';
-        $pluralModelClass = (string) str($modelClass)->pluralStudly();
-
         $panel = $this->option('panel');
-
         if ($panel) {
             $panel = Filament::getPanel($panel);
         }
-
         if (! $panel) {
             $panels = Filament::getPanels();
-
             /** @var Panel $panel */
             $panel = (count($panels) > 1) ? $panels[select(
                 label: 'Which panel would you like to create this in?',
@@ -63,6 +42,36 @@ class MakeApiServiceCommand extends Command
                 default: Filament::getDefaultPanel()->getId()
             )] : Arr::first($panels);
         }
+
+        $inputResource = $this->argument('resource') ?? text(
+            label: 'What is the Resource name?',
+            placeholder: 'Blog',
+            required: true,
+        );
+
+        // Normalize to namespace format
+        $inputResource = \Illuminate\Support\Str::of($inputResource)
+            ->replace('/', '\\')
+            ->trim('\\')
+            ->trim(' ');
+
+        // If input is fully qualified (starts with App\\), use as-is, otherwise prepend default
+        if (!\Illuminate\Support\Str::of($inputResource)->startsWith('App\\')) {
+            $resourceNamespaceBase = Arr::first($panel->getResourceNamespaces()) ?? 'App\\Filament\\Resources';
+            $model = $resourceNamespaceBase . '\\' . $inputResource;
+        } else {
+            $model = (string) $inputResource;
+        }
+
+        // Remove trailing 'Resource' for model namespace
+        $model = \Illuminate\Support\Str::of($model)->beforeLast('Resource');
+        if (blank($model)) {
+            $model = 'Resource';
+        }
+
+        $modelClass = (string) \Illuminate\Support\Str::of($model)->afterLast('\\');
+        $modelNamespace = \Illuminate\Support\Str::of($model)->contains('\\') ? (string) \Illuminate\Support\Str::of($model)->beforeLast('\\') : '';
+        $pluralModelClass = (string) \Illuminate\Support\Str::of($modelClass)->pluralStudly();
 
         $resourceDirectories = $panel->getResourceDirectories();
         $resourceNamespaces = $panel->getResourceNamespaces();
