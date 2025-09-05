@@ -55,9 +55,17 @@ class MakeApiServiceCommand extends Command
             ->trim('\\')
             ->trim(' ');
 
-        // If input is fully qualified (starts with App\\), use as-is, otherwise prepend default
-        if (!\Illuminate\Support\Str::of($inputResource)->startsWith('App\\')) {
-            $resourceNamespaceBase = Arr::first($panel->getResourceNamespaces()) ?? 'App\\Filament\\Resources';
+        // If input is fully qualified (starts with any known resource namespace), use as-is, otherwise prepend default
+        $resourceNamespaces = $panel->getResourceNamespaces();
+        $resourceNamespaceBase = Arr::first($resourceNamespaces) ?? 'App\\Filament\\Resources';
+        $startsWithKnownNamespace = false;
+        foreach ($resourceNamespaces as $ns) {
+            if (Str::startsWith($inputResource, $ns)) {
+                $startsWithKnownNamespace = true;
+                break;
+            }
+        }
+        if (!$startsWithKnownNamespace) {
             $model = $resourceNamespaceBase . '\\' . $inputResource;
         } else {
             $model = (string) $inputResource;
