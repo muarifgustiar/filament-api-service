@@ -70,6 +70,8 @@ class MakeApiServiceCommand extends Command
         } else {
             $model = (string) $inputResource;
         }
+        // Always remove any leading App\Filament\Resources\ from the model
+        $model = preg_replace('/^App\\Filament\\Resources\\/i', '', $model);
 
         // Remove trailing 'Resource' for model namespace
         $model = \Illuminate\Support\Str::of($model)->beforeLast('Resource');
